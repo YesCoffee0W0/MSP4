@@ -20,7 +20,7 @@ enable
 configure terminal
 hostname R1
 # 에러 메세지 해결
-no ip domain-lookup
+no ip domain lookup
 no service config  
 no cts logging verbose
 no ntp server
@@ -130,33 +130,52 @@ pnet & ubuntu setting > add Network Adapter > custom to VMnet#
 
 ------
   
-Vmware 네트워크
-  NAT (가장 많이 사용함):  
-    가상 호스트 > 인터넷 O  
-    가상 호스트 < 인터넷 X (포트 포워딩을 하면 가능)
+### VMware 네트워크 요약
 
-  HostOnly  
-    가상 호스트 <> 가상 호스트 (only)    
-    격리된 네트워크 (private network)
-  Bridge  
-    가상 호스트가 실제 IP 주소를 할당 받아 사용
-  
-  Network Adapter (가상 머신의 NIC)
-    ...2
-    ...3
-    ...4
-    끝에 붙으면 그 수를 추가하는 것
+- **NAT (Network Address Translation)**
+  - 가장 많이 사용되는 방식.
+  - 가상 머신(게스트)에서 외부 인터넷 접속 O  
+  - 외부에서 가상 머신으로 직접 접근 X (포트 포워딩 설정 시 접근 가능)
+  - 실제 네트워크와 분리되어 있어 보안성이 높음.
+  - VMnet8 네트워크가 기본적으로 NAT에 할당됨.
 
-  VMnet (가상의 네트워크)
-    ex. VMnet1, VMnet2, ...VMnetN
-    VMnet1 <> HostOnly
-    VMnet8 & VMnet0 (특수 용도로 사용)
-    VMnet8 <> NAT (NA 무조선 8에 붙어 있음)
-    VMnet0 <> Bridge
+- **HostOnly**
+  - 가상 머신들끼리만 통신 가능(Host <-> Guest, Guest <-> Guest).
+  - 외부 네트워크와 완전히 격리된 프라이빗 네트워크.
+  - 실습 환경이나 내부 테스트에 적합.
+  - VMnet1 네트워크가 기본적으로 HostOnly에 할당됨.
 
-  NA2 번부터 VMnet1이라던지 2에 붙을 수 있음
+- **Bridge**
+  - 가상 머신이 실제 물리 네트워크의 IP를 직접 할당받아 사용.
+  - 물리 네트워크와 동일한 대역에서 동작, 외부 장비와도 직접 통신 가능.
+  - 사내 네트워크 등 실제 환경과 연동할 때 주로 사용.
+  - VMnet0 네트워크가 Bridge에 할당됨.
 
-  방화벽 (win+R > wf.msc) > ICMP 규칙 활성화 > 속성 > 영역 > 원격 주소 > 모든 IP 허용
+- **Network Adapter (가상 머신의 NIC)**
+  - 가상 머신에 여러 개의 네트워크 어댑터(NIC) 추가 가능.
+  - 어댑터 번호가 올라갈수록 NIC 개수 증가(예: eth0, eth1, ...).
+  - 각 NIC마다 다른 네트워크(VMnet)에 연결할 수 있음.
+
+- **VMnet (가상 네트워크)**
+  - VMnet1: HostOnly 네트워크
+  - VMnet8: NAT 네트워크
+  - VMnet0: Bridge 네트워크
+  - VMnet2~N: 사용자 정의 네트워크로 추가 가능 (실습 목적 등)
+  - 각 VM의 NIC를 원하는 VMnet에 연결해 다양한 네트워크 토폴로지 구성 가능
+
+- **방화벽 설정**
+  - Windows 방화벽(wf.msc)에서 ICMP 규칙 활성화 필요
+  - 속성 > 영역 > 원격 주소 > 모든 IP 허용으로 설정해야 ping 등 네트워크 테스트 가능
+
+> **참고:**  
+> 여러 VM을 띄워 실습할 때, 각 VM의 네트워크 어댑터를 HostOnly, NAT, Bridge 등으로 적절히 조합하면 실제 네트워크 환경과 유사하게 구성할 수
+
+
+
+
+
+
+
 
   # Task 1
   기존 토폴로지에 Router 및 VPC 추가해서 ping 확인하기
@@ -202,8 +221,31 @@ Vmware 네트워크
   > ping 128.16.0.2
   ```
 
+# 08-06 (WED)
+### VMware와 Vagrant Overview
 
+#### 1. VMware (가상화 솔루션)
+- **호스트(Host):** 실제 컴퓨터, 물리적 장치(CPU, RAM, 저장장치, NIC 등)를 가짐
+- **가상 머신(Guest OS):** 논리적으로 만들어진 컴퓨터(vCPU, vRAM, 가상 NIC 등)
+- **가상화 시스템 필요성:**  
+  - 여러 가상 머신이 물리 자원을 효율적으로 나눠 쓸 수 있도록 스케줄링
+  - 물리적 RAM 등 자원 충돌 방지 및 영역 분리 필요
 
-
-
+#### 2. Vagrant
+- **정의:**  
+  - 가상 머신 이미지를 코드로 관리할 수 있게 해주는 도구(명령줄 기반)
+  - 가상화 솔루션(예: VMware, VirtualBox 등) 위에서 동작
+- **장점:**  
+  - 미리 준비된 OS 이미지(Box)로 손쉽게 가상 머신 생성
+  - Vagrantfile로 VM 설정을 코드로 관리
+- **Provider:**  
+  - 실제 가상 머신을 실행하는 플랫폼 (예: VMware, VirtualBox)
+- **플러그인:**  
+  - VMware 사용 시 `vagrant-vmware-desktop` 플러그인 필요  
+  - 설치 명령어:  
+    ```bash
+    vagrant plugin install vagrant-vmware-desktop
+    ```
+- **유틸리티:**  
+  - Vagrant VMware Utility 필요 (별도 설치)
 
